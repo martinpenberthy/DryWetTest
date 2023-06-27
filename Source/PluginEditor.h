@@ -31,6 +31,11 @@ private:
     
     juce::Slider sliderMix;
     juce::Label labelMix;
+    
+    
+    std::unique_ptr<juce::AudioProcessorValueTreeState::SliderAttachment> sliderAttachmentPreGain;
+    std::unique_ptr<juce::AudioProcessorValueTreeState::SliderAttachment> sliderAttachmentMix;
+
     // This reference is provided as a quick way for your editor to
     // access the processor object that created it.
     DryWetTestAudioProcessor& audioProcessor;

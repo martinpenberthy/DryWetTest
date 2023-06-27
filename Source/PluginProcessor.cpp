@@ -19,14 +19,29 @@ DryWetTestAudioProcessor::DryWetTestAudioProcessor()
                       #endif
                        .withOutput ("Output", juce::AudioChannelSet::stereo(), true)
                      #endif
-                       )
+                       ), treeState(*this, nullptr, juce::Identifier("PARAMETERS"), createParameterLayout())
 #endif
 {
+
+    treeState.state.addListener(this);
+
 }
 
 DryWetTestAudioProcessor::~DryWetTestAudioProcessor()
 {
 }
+
+juce::AudioProcessorValueTreeState::ParameterLayout DryWetTestAudioProcessor::createParameterLayout()
+{
+    std::vector <std::unique_ptr<juce::RangedAudioParameter>> params;
+    params.push_back(std::make_unique<juce::AudioParameterFloat>(juce::ParameterID {"PREGAIN", 1}, "PreGain", -96.0f, 48.0f, 0.0f));
+    
+    params.push_back(std::make_unique<juce::AudioParameterFloat>(juce::ParameterID {"MIX", 1}, "Mix", 0.0f, 1.0f, 0.0f));
+
+
+    return {params.begin(), params.end()};
+}
+
 
 //==============================================================================
 const juce::String DryWetTestAudioProcessor::getName() const
@@ -95,6 +110,17 @@ void DryWetTestAudioProcessor::prepareToPlay (double sampleRate, int samplesPerB
 {
     // Use this method as the place to do any pre-playback
     // initialisation that you need..
+    
+    waveshaper.functionToUse = [](float x)
+    {
+        return x / (std::abs(x) + 1);
+    };
+    
+    preGain.setGainDecibels(*treeState.getRawParameterValue("PREGAIN"));
+    
+    mix.setWetMixProportion(*treeState.getRawParameterValue("MIX"));
+    mix.setMixingRule(juce::dsp::DryWetMixingRule::linear);
+    mix.setWetLatency(1.0f);
 }
 
 void DryWetTestAudioProcessor::releaseResources()
@@ -144,18 +170,16 @@ void DryWetTestAudioProcessor::processBlock (juce::AudioBuffer<float>& buffer, j
     for (auto i = totalNumInputChannels; i < totalNumOutputChannels; ++i)
         buffer.clear (i, 0, buffer.getNumSamples());
 
-    // This is the place where you'd normally do the guts of your plugin's
-    // audio processing...
-    // Make sure to reset the state if your inner loop is processing
-    // the samples and the outer loop is handling the channels.
-    // Alternatively, you can process the samples with the channels
-    // interleaved by keeping the same state.
-    for (int channel = 0; channel < totalNumInputChannels; ++channel)
-    {
-        auto* channelData = buffer.getWritePointer (channel);
-
-        // ..do something to the data...
-    }
+    juce::dsp::AudioBlock<float> drySamplesBlock (buffer);
+    mix.pushDrySamples(drySamplesBlock);
+    
+    
+    
+    preGain.setGainDecibels(*treeState.getRawParameterValue("PREGAIN"));
+    
+    juce::dsp::AudioBlock<float> preGainBlock (buffer);
+    preGain.process(juce::dsp::ProcessContextReplacing<float>(preGainBlock));
+    
 }
 
 //==============================================================================
