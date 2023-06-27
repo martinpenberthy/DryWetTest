@@ -34,7 +34,7 @@ DryWetTestAudioProcessor::~DryWetTestAudioProcessor()
 juce::AudioProcessorValueTreeState::ParameterLayout DryWetTestAudioProcessor::createParameterLayout()
 {
     std::vector <std::unique_ptr<juce::RangedAudioParameter>> params;
-    params.push_back(std::make_unique<juce::AudioParameterFloat>(juce::ParameterID {"PREGAIN", 1}, "PreGain", -96.0f, 48.0f, 0.0f));
+    params.push_back(std::make_unique<juce::AudioParameterFloat>(juce::ParameterID {"PREGAIN", 1}, "PreGain", 0.0f, 48.0f, 0.0f));
     
     params.push_back(std::make_unique<juce::AudioParameterFloat>(juce::ParameterID {"MIX", 1}, "Mix", 0.0f, 1.0f, 0.0f));
 
@@ -111,6 +111,11 @@ void DryWetTestAudioProcessor::prepareToPlay (double sampleRate, int samplesPerB
     // Use this method as the place to do any pre-playback
     // initialisation that you need..
     
+    juce::dsp::ProcessSpec spec;
+    spec.sampleRate = sampleRate;
+    spec.maximumBlockSize = samplesPerBlock;
+    spec.numChannels = getTotalNumOutputChannels();
+    
     waveshaper.functionToUse = [](float x)
     {
         return x / (std::abs(x) + 1);
@@ -121,6 +126,10 @@ void DryWetTestAudioProcessor::prepareToPlay (double sampleRate, int samplesPerB
     mix.setWetMixProportion(*treeState.getRawParameterValue("MIX"));
     mix.setMixingRule(juce::dsp::DryWetMixingRule::linear);
     mix.setWetLatency(1.0f);
+    
+    waveshaper.prepare(spec);
+    preGain.prepare(spec);
+    mix.prepare(spec);
 }
 
 void DryWetTestAudioProcessor::releaseResources()
@@ -175,8 +184,6 @@ void DryWetTestAudioProcessor::processBlock (juce::AudioBuffer<float>& buffer, j
     mix.pushDrySamples(drySamplesBlock);
     mix.setWetMixProportion(*treeState.getRawParameterValue("MIX"));
     
-    
-    
     //Set preGain
     preGain.setGainDecibels(*treeState.getRawParameterValue("PREGAIN"));
     
@@ -189,8 +196,8 @@ void DryWetTestAudioProcessor::processBlock (juce::AudioBuffer<float>& buffer, j
     waveshaper.process(juce::dsp::ProcessContextReplacing<float>(waveshapeBlock));
     
     //Mix in wet samples
-    juce::dsp::AudioBlock<float> wetSamplesBlock (buffer);
-    mix.mixWetSamples(wetSamplesBlock);
+    //juce::dsp::AudioBlock<float> wetSamplesBlock (buffer);
+    mix.mixWetSamples(waveshapeBlock);
     
 }
 
