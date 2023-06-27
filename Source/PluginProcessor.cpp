@@ -170,15 +170,27 @@ void DryWetTestAudioProcessor::processBlock (juce::AudioBuffer<float>& buffer, j
     for (auto i = totalNumInputChannels; i < totalNumOutputChannels; ++i)
         buffer.clear (i, 0, buffer.getNumSamples());
 
+    //Set dry samples
     juce::dsp::AudioBlock<float> drySamplesBlock (buffer);
     mix.pushDrySamples(drySamplesBlock);
+    mix.setWetMixProportion(*treeState.getRawParameterValue("MIX"));
     
     
     
+    //Set preGain
     preGain.setGainDecibels(*treeState.getRawParameterValue("PREGAIN"));
     
+    //Process preGain
     juce::dsp::AudioBlock<float> preGainBlock (buffer);
     preGain.process(juce::dsp::ProcessContextReplacing<float>(preGainBlock));
+    
+    //Process waveshaper
+    juce::dsp::AudioBlock<float> waveshapeBlock (buffer);
+    waveshaper.process(juce::dsp::ProcessContextReplacing<float>(waveshapeBlock));
+    
+    //Mix in wet samples
+    juce::dsp::AudioBlock<float> wetSamplesBlock (buffer);
+    mix.mixWetSamples(wetSamplesBlock);
     
 }
 
